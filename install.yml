@@ -1,0 +1,133 @@
+---
+- hosts: servers
+  user: root
+
+  tasks:
+  - name: Deploy postgres (Debian)
+    when: ansible_distribution == 'Debian'
+    block:
+    - name: Install postgres-15 (Debian)
+      apt: 
+        name:
+          - postgresql-15
+          - python3-psycopg2
+        state: present
+  
+    - name: Allow remote connections (Debian)
+      shell: sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/15/main/postgresql.conf
+
+    - block:
+      - name: Create student database (Debian)
+        postgresql_db:
+          state: present
+          name: student
+
+      - name: Create student user (Debian)
+        postgresql_user:
+          state: present
+          name: student
+          password: "{{ lookup('env','POSTGRES_STUDENT_PASSWORD') }}"
+        environment:
+          PGOPTIONS: "-c password_encryption=scram-sha-256"
+
+      - name: Grant student user access to student db (Debian)
+        postgresql_privs:
+          type: database
+          database: student
+          roles: student
+          grant_option: no
+          privs: all
+
+      - name: Allow connection for the student user (Debian)
+        postgresql_pg_hba:
+          dest: "/etc/postgresql/15/main/pg_hba.conf"
+          contype: host
+          databases: student
+          users: student
+          source: '{{ second_srv_addr }}/32'
+          method: scram-sha-256
+          create: true
+      
+      become: yes
+      become_user: postgres
+
+    - name: Restart postgres (Debian)
+      service:
+        name: postgresql
+        state: restarted
+
+  - name: Deploy postgres (AlmaLinux)
+    when: ansible_distribution == 'AlmaLinux'
+    block:
+    - name: Install postgres-server (AlmaLinux)
+      dnf: 
+        name:
+        - postgresql-server
+        - python3-psycopg2
+        state: present
+    
+    - name: Check if DB folder already exists (AlmaLinux)
+      stat:
+        path: /var/lib/pgsql/data/
+      register: stat_result
+
+    - name: Initdb postgres (AlmaLinux)
+      shell: '/usr/bin/postgresql-setup --initdb'
+      when: not stat_result.stat.exists
+    
+    - name: Allow remote connections (AlmaLinux)
+      shell: sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /var/lib/pgsql/data/postgresql.conf
+
+    - name: Enable postgresql on firewall (AlmaLinux)
+      ansible.posix.firewalld:
+        service: postgresql
+        state: enabled
+        permanent: true
+        immediate: true
+        offline: true
+    
+    - name: Start and enable postgres (AlmaLinux)
+      service:
+        name: postgresql
+        state: started
+        enabled: true
+    
+    - block:
+      - name: Create student database (AlmaLinux)
+        postgresql_db:
+          state: present
+          name: student
+
+      - name: Create student user (AlmaLinux)
+        postgresql_user:
+          state: present
+          name: student
+          password: "{{ lookup('env','POSTGRES_STUDENT_PASSWORD') }}"
+        environment:
+          PGOPTIONS: "-c password_encryption=scram-sha-256"
+
+      - name: Grant student user access to student db (AlmaLinux)
+        postgresql_privs:
+          type: database
+          database: student
+          roles: student
+          grant_option: no
+          privs: all
+
+      - name: Allow connection for the student user (AlmaLinux)
+        postgresql_pg_hba:
+          dest: "/var/lib/pgsql/data/pg_hba.conf"
+          contype: host
+          databases: student
+          users: student
+          source: '{{ second_srv_addr }}/32'
+          method: scram-sha-256
+          create: true
+      
+      become: yes
+      become_user: postgres
+
+    - name: Restart postgres (AlmaLinux)
+      service:
+        name: postgresql
+        state: restarted
