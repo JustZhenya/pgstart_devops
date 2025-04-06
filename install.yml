@@ -68,7 +68,7 @@
     
     - name: Check if DB folder already exists (AlmaLinux)
       stat:
-        path: /var/lib/pgsql/data/
+        path: /var/lib/pgsql/data/pg_hba.conf
       register: stat_result
 
     - name: Initdb postgres (AlmaLinux)

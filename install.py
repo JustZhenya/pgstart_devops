@@ -24,8 +24,8 @@ ret = bytes()
 try:
     ret = subprocess.check_output(
         env={'ANSIBLE_LOAD_CALLBACK_PLUGINS': '1', 'ANSIBLE_CALLBACKS_ENABLED': 'json', 'ANSIBLE_STDOUT_CALLBACK': 'json'},
-        args=["ansible", "-m", "setup", "-i", "hosts", "servers", "-a", "filter=ansible_loadavg"])               
-except subprocess.CalledProcessError as e:                                                                                                   
+        args=["ansible", "-m", "setup", "-i", "hosts", "servers", "-a", "filter=ansible_loadavg"])
+except subprocess.CalledProcessError as e:
     print("Не удалось проверить нагруженность. Все ли сервера доступны?")
     print(e.output.decode('utf-8'))
     sys.exit(3)
